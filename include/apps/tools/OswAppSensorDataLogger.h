@@ -22,14 +22,27 @@ public:
     void onStop() override;
 
 private:
-    // Sensor data structure
+    // Sensor data structure - enhanced with all available sensors
     struct SensorData {
+        // Environment sensors
         float temperature;
         float humidity;
         float pressure;
+        float magnetometerAzimuth;
+        
+        // Motion sensors
         float acceleration[3];
         int steps;
+        int activityMode;
+        
+        // Battery and system
         float batteryLevel;
+        int batteryRaw;
+        bool isCharging;
+        int ramUsed;
+        int ramTotal;
+        
+        // Timestamp
         unsigned long timestamp;
     };
 

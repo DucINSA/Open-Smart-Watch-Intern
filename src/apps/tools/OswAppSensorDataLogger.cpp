@@ -9,7 +9,7 @@ OswAppSensorDataLogger::OswAppSensorDataLogger() : OswAppV2() {
     this->lastUpdateTime = 0;
     this->lastServerUpdate = 0;
     this->serverConnected = false;
-    this->updateInterval = 5000; // 5 seconds
+    this->updateInterval = 1000; // 1 second for faster updates
     this->displayMode = 0;
     this->autoUpdate = true;
     this->serverUrl = "http://your-server.com/api/sensor-data";
@@ -94,32 +94,51 @@ void OswAppSensorDataLogger::onStop() {
 }
 
 void OswAppSensorDataLogger::updateSensorData() {
-    // Get temperature
-    if (OswHal::getInstance()->environment()) {
-        this->currentData.temperature = OswHal::getInstance()->environment()->getTemperature();
+    OswHal* hal = OswHal::getInstance();
+    
+    // Get all available sensor data in real-time (like OswAppPrintDebug)
+    if (hal->environment()) {
+        // Temperature
+        this->currentData.temperature = hal->environment()->getTemperature();
+        
+        // Acceleration data
+        this->currentData.acceleration[0] = hal->environment()->getAccelerationX();
+        this->currentData.acceleration[1] = hal->environment()->getAccelerationY();
+        this->currentData.acceleration[2] = hal->environment()->getAccelerationZ();
+        
+        // Steps
+        this->currentData.steps = hal->environment()->getStepsToday();
+        
+        // Additional sensors if available
+        #if OSW_PLATFORM_ENVIRONMENT_PRESSURE == 1
+        this->currentData.pressure = hal->environment()->getPressure();
+        #endif
+        
+        #if OSW_PLATFORM_ENVIRONMENT_HUMIDITY == 1
+        this->currentData.humidity = hal->environment()->getHumidity();
+        #endif
+        
+        #if OSW_PLATFORM_ENVIRONMENT_MAGNETOMETER == 1
+        this->currentData.magnetometerAzimuth = hal->environment()->getMagnetometerAzimuth();
+        #endif
     }
     
-    // Get acceleration data
-    if (OswHal::getInstance()->environment()) {
-        this->currentData.acceleration[0] = OswHal::getInstance()->environment()->getAccelerationX();
-        this->currentData.acceleration[1] = OswHal::getInstance()->environment()->getAccelerationY();
-        this->currentData.acceleration[2] = OswHal::getInstance()->environment()->getAccelerationZ();
-    }
+    // Get battery level (using raw value like debug app)
+    this->currentData.batteryLevel = hal->getBatteryPercent();
+    this->currentData.batteryRaw = hal->getBatteryRaw();
+    this->currentData.isCharging = hal->isCharging();
     
-    // Get steps
-    if (OswHal::getInstance()->environment()) {
-        this->currentData.steps = OswHal::getInstance()->environment()->getStepsToday();
-    }
-    
-    // Get battery level
-    this->currentData.batteryLevel = OswHal::getInstance()->getBatteryPercent();
+    // Get system info
+    this->currentData.ramUsed = ESP.getHeapSize() - ESP.getFreeHeap();
+    this->currentData.ramTotal = ESP.getHeapSize();
     
     // Get timestamp
     this->currentData.timestamp = millis();
     
-    OSW_LOG_D("Sensor data updated - Temp: ", this->currentData.temperature, 
+    OSW_LOG_D("Real-time sensor data updated - Temp: ", this->currentData.temperature, 
                " Steps: ", this->currentData.steps,
-               " Battery: ", this->currentData.batteryLevel);
+               " Battery: ", this->currentData.batteryLevel,
+               " RAM: ", this->currentData.ramUsed, "/", this->currentData.ramTotal);
 }
 
 void OswAppSensorDataLogger::sendDataToServer() {
@@ -149,58 +168,170 @@ void OswAppSensorDataLogger::sendDataToServer() {
 }
 
 void OswAppSensorDataLogger::drawSensorData() {
-    OswHal::getInstance()->gfx()->setTextSize(1);
-    OswHal::getInstance()->gfx()->setTextCursor(10, 30);
-    OswHal::getInstance()->gfx()->print("Temperature: ");
-    OswHal::getInstance()->gfx()->print(this->currentData.temperature, 1);
-    OswHal::getInstance()->gfx()->print("C");
+    OswHal* hal = OswHal::getInstance();
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 50);
-    OswHal::getInstance()->gfx()->print("Steps: ");
-    OswHal::getInstance()->gfx()->print(this->currentData.steps);
+    // Title - moved down to avoid round screen cutoff
+    hal->gfx()->setTextSize(1);
+    hal->gfx()->setTextCenterAligned();
+    hal->gfx()->setTextCursor(120, 40);
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print("Sensor Data");
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 70);
-    OswHal::getInstance()->gfx()->print("Battery: ");
-    OswHal::getInstance()->gfx()->print(this->currentData.batteryLevel, 1);
-    OswHal::getInstance()->gfx()->print("%");
+    // Sensor data - moved down for round screen
+    hal->gfx()->setTextSize(1);
+    hal->gfx()->setTextLeftAligned();
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 90);
-    OswHal::getInstance()->gfx()->print("Accel X: ");
-    OswHal::getInstance()->gfx()->print(this->currentData.acceleration[0], 2);
+    int yPos = 70; // Start lower to avoid top cutoff
+    int lineHeight = 18; // Increased spacing
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 110);
-    OswHal::getInstance()->gfx()->print("Accel Y: ");
-    OswHal::getInstance()->gfx()->print(this->currentData.acceleration[1], 2);
+    // Temperature
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Temp: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->currentData.temperature, 1);
+    hal->gfx()->print("°C");
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 130);
-    OswHal::getInstance()->gfx()->print("Accel Z: ");
-    OswHal::getInstance()->gfx()->print(this->currentData.acceleration[2], 2);
+    yPos += lineHeight;
+    
+    // Battery - emphasized for verification
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Battery: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->currentData.batteryLevel);
+    hal->gfx()->print("% (");
+    hal->gfx()->print(this->currentData.batteryRaw);
+    hal->gfx()->print(")");
+    if (this->currentData.isCharging) {
+        hal->gfx()->setTextColor(ui->getSuccessColor());
+        hal->gfx()->print(" CHG");
+    }
+    
+    yPos += lineHeight;
+    
+    // Steps
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Steps: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->currentData.steps);
+    
+    yPos += lineHeight;
+    
+    // RAM usage
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("RAM: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->currentData.ramUsed);
+    hal->gfx()->print("/");
+    hal->gfx()->print(this->currentData.ramTotal);
+    hal->gfx()->print("B");
+    
+    yPos += lineHeight;
+    
+    // Acceleration X
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Accel X: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->currentData.acceleration[0], 2);
+    
+    yPos += lineHeight;
+    
+    // Acceleration Y
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Accel Y: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->currentData.acceleration[1], 2);
+    
+    yPos += lineHeight;
+    
+    // Acceleration Z
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Accel Z: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->currentData.acceleration[2], 2);
+    
+    // Last update time at bottom
+    hal->gfx()->setTextCursor(20, 220);
+    hal->gfx()->setTextColor(ui->getBackgroundDimmedColor());
+    hal->gfx()->print("Updated: ");
+    hal->gfx()->print((millis() - this->lastUpdateTime) / 1000);
+    hal->gfx()->print("s ago");
 }
 
 void OswAppSensorDataLogger::drawConnectionStatus() {
-    OswHal::getInstance()->gfx()->setTextSize(1);
-    OswHal::getInstance()->gfx()->setTextCursor(10, 30);
-    OswHal::getInstance()->gfx()->print("Server Status:");
+    OswHal* hal = OswHal::getInstance();
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 50);
-    if (this->serverConnected) {
-        OswHal::getInstance()->gfx()->print("Connected");
-    } else {
-        OswHal::getInstance()->gfx()->print("Disconnected");
-    }
+    // Title - moved down for round screen
+    hal->gfx()->setTextSize(1);
+    hal->gfx()->setTextCenterAligned();
+    hal->gfx()->setTextCursor(120, 40);
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print("Network Status");
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 70);
-    OswHal::getInstance()->gfx()->print("URL: ");
-    OswHal::getInstance()->gfx()->print(this->serverUrl);
+    // Connection status - moved down for round screen
+    hal->gfx()->setTextSize(1);
+    hal->gfx()->setTextLeftAligned();
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 90);
-    OswHal::getInstance()->gfx()->print("Auto Update: ");
-    OswHal::getInstance()->gfx()->print(this->autoUpdate ? "ON" : "OFF");
+    int yPos = 70;
+    int lineHeight = 18;
     
-    OswHal::getInstance()->gfx()->setTextCursor(10, 110);
-    OswHal::getInstance()->gfx()->print("Interval: ");
-    OswHal::getInstance()->gfx()->print(this->updateInterval / 1000);
-    OswHal::getInstance()->gfx()->print("s");
+    // Server status
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Server: ");
+    hal->gfx()->setTextColor(this->serverConnected ? ui->getSuccessColor() : ui->getDangerColor());
+    hal->gfx()->print(this->serverConnected ? "Connected" : "Disconnected");
+    
+    yPos += lineHeight;
+    
+    // WiFi status
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("WiFi: ");
+    hal->gfx()->setTextColor(WiFi.status() == WL_CONNECTED ? ui->getSuccessColor() : ui->getDangerColor());
+    hal->gfx()->print(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
+    
+    yPos += lineHeight;
+    
+    // Auto update status
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Auto Update: ");
+    hal->gfx()->setTextColor(this->autoUpdate ? ui->getSuccessColor() : ui->getDangerColor());
+    hal->gfx()->print(this->autoUpdate ? "ON" : "OFF");
+    
+    yPos += lineHeight;
+    
+    // Update interval
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Interval: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print(this->updateInterval / 1000);
+    hal->gfx()->print("s");
+    
+    yPos += lineHeight;
+    
+    // Last server update
+    hal->gfx()->setTextCursor(20, yPos);
+    hal->gfx()->setTextColor(ui->getInfoColor());
+    hal->gfx()->print("Last Update: ");
+    hal->gfx()->setTextColor(ui->getForegroundColor());
+    hal->gfx()->print((millis() - this->lastServerUpdate) / 1000);
+    hal->gfx()->print("s ago");
+    
+    // Battery level at bottom for verification
+    hal->gfx()->setTextCursor(20, 220);
+    hal->gfx()->setTextColor(ui->getBackgroundDimmedColor());
+    hal->gfx()->print("Battery: ");
+    hal->gfx()->print(this->currentData.batteryLevel);
+    hal->gfx()->print("%");
 }
 
 void OswAppSensorDataLogger::drawSettings() {
@@ -219,16 +350,31 @@ void OswAppSensorDataLogger::drawSettings() {
 }
 
 String OswAppSensorDataLogger::formatSensorData() {
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(2048); // Increased size for more data
     
+    // Device info
     doc["device_id"] = "OSW_1";
     doc["timestamp"] = this->currentData.timestamp;
+    
+    // Environment sensors
     doc["temperature"] = this->currentData.temperature;
+    doc["humidity"] = this->currentData.humidity;
+    doc["pressure"] = this->currentData.pressure;
+    doc["magnetometer_azimuth"] = this->currentData.magnetometerAzimuth;
+    
+    // Motion sensors
     doc["steps"] = this->currentData.steps;
-    doc["battery"] = this->currentData.batteryLevel;
+    doc["activity_mode"] = this->currentData.activityMode;
     doc["acceleration"]["x"] = this->currentData.acceleration[0];
     doc["acceleration"]["y"] = this->currentData.acceleration[1];
     doc["acceleration"]["z"] = this->currentData.acceleration[2];
+    
+    // Battery and system
+    doc["battery"]["level"] = this->currentData.batteryLevel;
+    doc["battery"]["raw"] = this->currentData.batteryRaw;
+    doc["battery"]["charging"] = this->currentData.isCharging;
+    doc["system"]["ram_used"] = this->currentData.ramUsed;
+    doc["system"]["ram_total"] = this->currentData.ramTotal;
     
     String jsonString;
     serializeJson(doc, jsonString);
