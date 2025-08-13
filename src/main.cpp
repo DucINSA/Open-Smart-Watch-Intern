@@ -87,6 +87,8 @@
 #endif
 #include "./apps/tools/OswAppSensorDataLogger.h"
 
+
+
 // get global variables (make sure to NOT include any headers after the "using" statements!)
 #include "globals.h"
 using OswGlobals::main_mainDrawer;
@@ -130,6 +132,8 @@ void setup() {
     
     // Register custom sensor logger app
     main_mainDrawer.registerAppLazy<OswAppSensorDataLogger>("Tools");
+    
+
     try {
         main_mainDrawer.startApp(OswConfigAllKeys::settingDisplayDefaultWatchface.get().c_str()); // if this id is invalid, the drawer will fall back to alternatives automatically
     } catch(const std::runtime_error& e) {

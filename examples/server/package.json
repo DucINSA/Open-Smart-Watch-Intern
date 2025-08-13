@@ -1,0 +1,29 @@
+{
+  "name": "osw-communication-server",
+  "version": "1.0.0",
+  "description": "Test server for Open-SmartWatch communication framework",
+  "main": "test_server.js",
+  "scripts": {
+    "start": "node test_server.js",
+    "dev": "nodemon test_server.js"
+  },
+  "keywords": [
+    "open-smartwatch",
+    "communication",
+    "iot",
+    "sensors",
+    "esp32"
+  ],
+  "author": "Open-SmartWatch Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

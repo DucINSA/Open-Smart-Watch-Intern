@@ -55,7 +55,7 @@ OswServiceTask* oswServiceTasks[] = {
     & OswServiceAllTasks::example,
 #endif
 #ifdef OSW_FEATURE_WIFI
-    & OswServiceAllTasks::wifi, &OswServiceAllTasks::webserver,
+            & OswServiceAllTasks::wifi, &OswServiceAllTasks::webserver,
 #endif
 #ifdef OSW_FEATURE_BLE_SERVER
     & OswServiceAllTasks::bleServer,
